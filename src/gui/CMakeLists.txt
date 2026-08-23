@@ -267,7 +267,8 @@ target_link_libraries(qbt_gui
     PRIVATE
         qbt_base
     PUBLIC
-        Qt::Gui Qt::Widgets
+        Qt::Gui
+        Qt::Widgets
 )
 
 if (DBUS)
@@ -278,6 +279,16 @@ if (DBUS)
         notifications/dbusnotificationsinterface.cpp
         powermanagement/inhibitordbus.h
         powermanagement/inhibitordbus.cpp
+    )
+endif()
+
+if (PLUGINS)
+    qt_wrap_ui(PLUGINS_UI_HEADERS plugins/pluginsdialog.ui)
+
+    target_sources(qbt_gui PRIVATE
+        plugins/pluginsdialog.h
+        plugins/pluginsdialog.cpp
+        ${PLUGINS_UI_HEADERS}
     )
 endif()
 

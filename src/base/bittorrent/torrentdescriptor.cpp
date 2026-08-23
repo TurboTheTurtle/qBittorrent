@@ -41,11 +41,13 @@
 #include <QRegularExpression>
 #include <QUrl>
 
-#include "base/global.h"
+#include "base/path.h"
 #include "base/preferences.h"
 #include "base/utils/io.h"
 #include "infohash.h"
 #include "trackerentry.h"
+
+using namespace Qt::Literals::StringLiterals;
 
 namespace
 {
@@ -133,18 +135,28 @@ try
 }
 catch (const lt::system_error &err)
 {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    return nonstd::make_unexpected(QString::fromStdString(err.what()));
+#else
     return nonstd::make_unexpected(QString::fromLocal8Bit(err.what()));
+#endif
 }
 
 nonstd::expected<BitTorrent::TorrentDescriptor, QString>
 BitTorrent::TorrentDescriptor::loadFromFile(const Path &path) noexcept
 try
 {
-    return TorrentDescriptor(lt::load_torrent_file(path.toString().toStdString(), loadTorrentLimits()));
+    TorrentDescriptor torrentDescriptor {lt::load_torrent_file(path.toString().toStdString(), loadTorrentLimits())};
+    torrentDescriptor.m_source = path.data();
+    return torrentDescriptor;
 }
 catch (const lt::system_error &err)
 {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    return nonstd::make_unexpected(QString::fromStdString(err.what()));
+#else
     return nonstd::make_unexpected(QString::fromLocal8Bit(err.what()));
+#endif
 }
 
 nonstd::expected<BitTorrent::TorrentDescriptor, QString>
@@ -159,11 +171,17 @@ try
 
     lt::add_torrent_params params = lt::parse_magnet_uri(magnetURI.toStdString());
     removeUnsupportedTrackers(params);
-    return TorrentDescriptor(std::move(params));
+    TorrentDescriptor torrentDescriptor {std::move(params)};
+    torrentDescriptor.m_source = magnetURI;
+    return torrentDescriptor;
 }
 catch (const lt::system_error &err)
 {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    return nonstd::make_unexpected(QString::fromStdString(err.what()));
+#else
     return nonstd::make_unexpected(QString::fromLocal8Bit(err.what()));
+#endif
 }
 
 nonstd::expected<void, QString> BitTorrent::TorrentDescriptor::saveToFile(const Path &path) const
@@ -178,7 +196,11 @@ try
 }
 catch (const lt::system_error &err)
 {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    return nonstd::make_unexpected(QString::fromStdString(err.what()));
+#else
     return nonstd::make_unexpected(QString::fromLocal8Bit(err.what()));
+#endif
 }
 
 nonstd::expected<QByteArray, QString> BitTorrent::TorrentDescriptor::saveToBuffer() const
@@ -194,7 +216,11 @@ try
 }
 catch (const lt::system_error &err)
 {
+#if LIBTORRENT_VERSION_NUM >= 20100
+    return nonstd::make_unexpected(QString::fromStdString(err.what()));
+#else
     return nonstd::make_unexpected(QString::fromLocal8Bit(err.what()));
+#endif
 }
 
 BitTorrent::TorrentDescriptor::TorrentDescriptor(lt::add_torrent_params ltAddTorrentParams)
@@ -272,11 +298,22 @@ void BitTorrent::TorrentDescriptor::setTorrentInfo(TorrentInfo torrentInfo)
 
 QList<BitTorrent::TrackerEntry> BitTorrent::TorrentDescriptor::trackers() const
 {
+    // libtorrent does not guarantee `add_torrent_params.trackers.size() == add_torrent_params.tracker_tiers.size()`
+
+    const qsizetype trackerCount = m_ltAddTorrentParams.trackers.size();
+    const qsizetype tierCount = m_ltAddTorrentParams.tracker_tiers.size();
+
     QList<TrackerEntry> ret;
-    ret.reserve(static_cast<decltype(ret)::size_type>(m_ltAddTorrentParams.trackers.size()));
-    std::size_t i = 0;
-    for (const std::string &tracker : m_ltAddTorrentParams.trackers)
-        ret.append({QString::fromStdString(tracker), m_ltAddTorrentParams.tracker_tiers[i++]});
+    ret.reserve(trackerCount);
+
+    int tier = 0;
+    for (qsizetype i = 0; i < trackerCount; ++i)
+    {
+        const auto tracker = QString::fromStdString(m_ltAddTorrentParams.trackers[i]);
+        if (i < tierCount)
+            tier = m_ltAddTorrentParams.tracker_tiers[i];
+        ret.append({.url = tracker, .tier = tier});
+    }
 
     return ret;
 }
@@ -290,6 +327,11 @@ QList<QUrl> BitTorrent::TorrentDescriptor::urlSeeds() const
         urlSeeds.append(QUrl(QString::fromStdString(nativeURLSeed)));
 
     return urlSeeds;
+}
+
+QString BitTorrent::TorrentDescriptor::source() const
+{
+    return m_source;
 }
 
 const libtorrent::add_torrent_params &BitTorrent::TorrentDescriptor::ltAddTorrentParams() const

@@ -18,9 +18,12 @@ set(testFiles
     testutilsbytearray.cpp
     testutilscompare.cpp
     testutilsdatetime.cpp
+    testutilsdict.cpp
     testutilsgzip.cpp
+    testutilshashvalue.cpp
     testutilsio.cpp
     testutilsmisc.cpp
+    testutilsnet.cpp
     testutilsnumber.cpp
     testutilsstring.cpp
     testutilsversion.cpp
