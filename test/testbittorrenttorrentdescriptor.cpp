@@ -28,6 +28,8 @@
 
 #include <QObject>
 #include <QTest>
+#include <QUrl>
+#include <QUrlQuery>
 
 #include "base/bittorrent/torrentdescriptor.h"
 #include "base/bittorrent/trackerentry.h"
@@ -44,21 +46,26 @@ public:
 private slots:
     void testParseMagnetFiltersUnsupportedTrackers() const
     {
-        const QString magnet =
-                u"magnet:?xt=urn:btih:c58645e2e922428dceb1f98f51ffa424810570f0"
-                "&tr=http%3A%2F%2Ftracker.example.com%2Fannounce"
-                "&tr=udp%3A%2F%2Ftracker.example.com%3A1337%2Fannounce"
-                "&tr=%3C!DOCTYPE%20html%3E%3Chtml%3E"
-                "&tr=ftp%3A%2F%2Ftracker.example.com%2Fannounce"
-                "&tr=313131"_s;
+        const QString httpTracker = u"http://tracker.example.com/announce"_s;
+        const QString udpTracker = u"udp://tracker.example.com:1337/announce"_s;
+        const QString unsupportedTracker = u"ftp://tracker.example.com/announce"_s;
 
-        const auto parseResult = BitTorrent::TorrentDescriptor::parse(magnet);
+        QUrl magnet {u"magnet:?xt=urn:btih:c58645e2e922428dceb1f98f51ffa424810570f0"_s};
+        QUrlQuery query {magnet};
+        query.addQueryItem(u"tr"_s, httpTracker);
+        query.addQueryItem(u"tr"_s, udpTracker);
+        query.addQueryItem(u"tr"_s, u"<!DOCTYPE html><html>"_s);
+        query.addQueryItem(u"tr"_s, unsupportedTracker);
+        query.addQueryItem(u"tr"_s, u"313131"_s);
+        magnet.setQuery(query);
+
+        const auto parseResult = BitTorrent::TorrentDescriptor::parse(magnet.toString(QUrl::FullyEncoded));
         QVERIFY(parseResult);
 
         const QList<BitTorrent::TrackerEntry> trackers = parseResult.value().trackers();
         QCOMPARE(trackers.size(), 2);
-        QCOMPARE(trackers.at(0).url, u"http://tracker.example.com/announce"_s);
-        QCOMPARE(trackers.at(1).url, u"udp://tracker.example.com:1337/announce"_s);
+        QCOMPARE(trackers.at(0).url, httpTracker);
+        QCOMPARE(trackers.at(1).url, udpTracker);
 
         const lt::add_torrent_params &nativeParams = parseResult.value().ltAddTorrentParams();
         QCOMPARE(nativeParams.trackers.size(), 2);

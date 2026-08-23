@@ -104,8 +104,8 @@ namespace
             return;
 
         std::vector<std::string> trackers;
-        std::vector<int> trackerTiers;
         trackers.reserve(params.trackers.size());
+        std::vector<int> trackerTiers;
         trackerTiers.reserve(params.trackers.size());
 
         for (std::size_t i = 0; i < params.trackers.size(); ++i)
@@ -157,7 +157,9 @@ try
     else if (isV1Hash(str))
         magnetURI = u"magnet:?xt=urn:btih:" + str;
 
-    return TorrentDescriptor(lt::parse_magnet_uri(magnetURI.toStdString()));
+    lt::add_torrent_params params = lt::parse_magnet_uri(magnetURI.toStdString());
+    removeUnsupportedTrackers(params);
+    return TorrentDescriptor(std::move(params));
 }
 catch (const lt::system_error &err)
 {
@@ -198,8 +200,6 @@ catch (const lt::system_error &err)
 BitTorrent::TorrentDescriptor::TorrentDescriptor(lt::add_torrent_params ltAddTorrentParams)
     : m_ltAddTorrentParams {std::move(ltAddTorrentParams)}
 {
-    removeUnsupportedTrackers(m_ltAddTorrentParams);
-
     if (m_ltAddTorrentParams.ti && m_ltAddTorrentParams.ti->is_valid())
     {
         m_info.emplace(*m_ltAddTorrentParams.ti);
