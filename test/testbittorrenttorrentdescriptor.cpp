@@ -48,15 +48,19 @@ private slots:
     {
         const QString httpTracker = u"http://tracker.example.com/announce"_s;
         const QString udpTracker = u"udp://tracker.example.com:1337/announce"_s;
+        const QString htmlTracker = u"<!DOCTYPE html><html>"_s;
         const QString unsupportedTracker = u"ftp://tracker.example.com/announce"_s;
+        const QString invalidTracker = u"313131"_s;
 
-        QUrl magnet {u"magnet:?xt=urn:btih:c58645e2e922428dceb1f98f51ffa424810570f0"_s};
-        QUrlQuery query {magnet};
-        query.addQueryItem(u"tr"_s, httpTracker);
-        query.addQueryItem(u"tr"_s, udpTracker);
-        query.addQueryItem(u"tr"_s, u"<!DOCTYPE html><html>"_s);
-        query.addQueryItem(u"tr"_s, unsupportedTracker);
-        query.addQueryItem(u"tr"_s, u"313131"_s);
+        const QUrlQuery query {
+            {u"xt"_s, u"urn:btih:c58645e2e922428dceb1f98f51ffa424810570f0"_s},
+            {u"tr"_s, httpTracker},
+            {u"tr"_s, udpTracker},
+            {u"tr"_s, htmlTracker},
+            {u"tr"_s, unsupportedTracker},
+            {u"tr"_s, invalidTracker}
+        };
+        QUrl magnet {u"magnet:"_s};
         magnet.setQuery(query);
 
         const auto parseResult = BitTorrent::TorrentDescriptor::parse(magnet.toString(QUrl::FullyEncoded));
